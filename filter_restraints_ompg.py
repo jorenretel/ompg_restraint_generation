@@ -348,7 +348,9 @@ def deleteItem(item):
         constraint_got_deleted = True
 
     constraintSet.checkAllValid()
+    project.__dict__['override'] = False
     constraintSet.__dict__['isModified'] = True
+
 
     for func in item._notifies.get('delete', []):
         func(item)

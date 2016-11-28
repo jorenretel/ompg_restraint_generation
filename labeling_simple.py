@@ -4,6 +4,11 @@ from itertools import product
 
 
 def group_by_residue(atoms):
+    '''Groups and iterable of atoms by residue.
+       Returns a dict where the keys are molResidues
+       and the values are the sets of atoms.
+
+    '''
 
     residueDict = {}
     for atom in atoms:
@@ -16,6 +21,11 @@ def group_by_residue(atoms):
 
 
 def group_by_molecule(atoms):
+    '''Groups and iterable of atoms by molecule.
+       Returns a dict where the keys are molecules
+       and the values are the sets of atoms.
+
+    '''
 
     moleculeDict = {}
     for atom in atoms:
@@ -50,6 +60,14 @@ def getAtomsForResonance(resonance):
 
 
 def getExperimentResonanceSetFractions(experiment, resonances):
+    '''Get the colabelling (simulatanuous labelling) of a set of resonances.
+       inputs:  experiment (Nmr.Experiment)
+                resonances (iterable of Resonances)
+       returns: fraction of colabelling (Float between 0 and 1)
+
+       DISCLAIMER: works only for assigned resonances at the moment.
+
+    '''
 
     atomGroups = [getAtomsForResonance(resonance) for resonance in resonances]
     isotopes = [resonance.isotopeCode for resonance in resonances]
@@ -61,11 +79,14 @@ def getExperimentResonanceSetFractions(experiment, resonances):
 
 
 def getExperimentAtomSetFractions(experiment, atoms, isotopes):
-    """Descrn: Get the combined isotope proportions for a given set of molecular
-               system atoms for a given experiment (label mixture).
-       Inputs: Nmr.Experiment, MolSystem.Atom, MolSystem.Atom
+    '''Get simulatanuous labelling of a set of atoms to specific isotopes.
+       inputs:  experiment (Nmr.Experiment)
+                atoms (list of Atoms)
+                isotopes (list of str isotopeCodes corresponding to
+                list of atoms)
+       returns: fraction of colabelling (Float between 0 and 1)
 
-    """
+    '''
 
     if not check_atoms_isotopes(atoms, isotopes):
         return 0.0
@@ -88,16 +109,6 @@ def getExperimentAtomSetFractions(experiment, atoms, isotopes):
 
 
 def getMixtureAtomSetFractions(labeledMixture, atoms, isotopes):
-    """get the isotope pair : fraction dictionary for a labeledMixture
-
-    labeledMixture:  LabeledMixture object
-    resIds: length-two tuple of residue serials
-    atNames: length-two tuple of atom names
-
-    Returns (isotopeCode1, isotopeCode2):fraction dictionary
-    with fractions normalised to 1.0
-    """
-
 
     molLabelFractions = labeledMixture.molLabelFractions
     molWeightSum = sum([x.weight for x in molLabelFractions])
@@ -176,7 +187,7 @@ def getIsotopomerAtomSetFractions(isotopomer, atoms, isotopes):
         atLabel = isotopomer.findFirstAtomLabel(name=name,
                                                 subType=subType,
                                                 isotopeCode=isotope)
-        atomLabelling = atLabel.weight / sumWeight
+        atomLabelling = atLabel.weight / float(sumWeight)
         colabelling *= atomLabelling
 
     return colabelling

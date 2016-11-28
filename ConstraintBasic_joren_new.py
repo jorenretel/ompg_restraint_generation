@@ -4,6 +4,9 @@ from filter_restraints_ompg import select_most_symmetric_contributions
 import labeling_simple
 reload(labeling_simple)
 from labeling_simple import getExperimentResonanceSetFractions
+import restraintGeneration
+reload(restraintGeneration  )
+from restraintGeneration import peak_is_diagonal
 
 
 def main_test(argServer):
@@ -37,6 +40,8 @@ def main_test(argServer):
     expName = '250_HNN_30_10_sp035'
     peakListSerial = 2
     experiment = nmrProject.findFirstExperiment(name=expName)
+    print experiment.expTransfers
+
     spectrum = experiment.findFirstDataSource()
     peakList = spectrum.findFirstPeakList(serial=peakListSerial)
     #distanceFunction = DistanceFunctionProtonDetected(peakList, [(0.25, 3.1, 1.0, 3.5), (0.0, 4.4, 1.0, 5.5)])
@@ -64,7 +69,7 @@ def main_test(argServer):
 
     # keep those contributions that appear most
     # symmetrically in spectra.
-    #select_most_symmetric_contributions([HHN, NNH], 1.0)
+    select_most_symmetric_contributions([HHN, NNH], 1.0)
 
 
 def simple_shift_match_pdsd(nmrProject, expName, peakListSerial,
@@ -186,6 +191,7 @@ def makeAmbigDistConstraints_modified(peakList, tolerances, chemShiftRanges, con
   experiment = spectrum.experiment
   nmrProject = experiment.nmrProject
   distDataDims = getThroughSpaceDataDims(spectrum)
+  print 'distdataDims ', distDataDims
   distIndices  = [dd.dim-1 for dd in distDataDims]
 
   if len(distDataDims) != 2:
@@ -240,42 +246,24 @@ def makeAmbigDistConstraints_modified(peakList, tolerances, chemShiftRanges, con
         expDimRef = dataDim.expDim.sortedExpDimRefs()[0]
         indirectDims[dataDim.dim] = isotopesDict[expDimRef]
 
+  print 'indirect dims : ', indirectDims
+
   workingPeaks = []
   for peak in peakList.sortedPeaks():
+
     # filter out diagonals
-    if ignoreDiagonals:
-      peakDims = peak.sortedPeakDims()
-      peakDim1 = peakDims[distIndices[0]]
-      peakDim2 = peakDims[distIndices[1]]
-      ppm1 = peakDim1.realValue
-      ppm2 = peakDim2.realValue
+    if ignoreDiagonals and peak_is_diagonal(peak, tolerances):
+      diagonalPeaks.append(peak)
+      print 'found diagonal ', peak
+      continue
 
-      delta = abs(ppm1-ppm2)
-
-      if (delta <= tolDict[distDim1][0] ) or (delta <= tolDict[distDim2][0]):
-        dataDimA = bondedDims.get(distDim1)
-        dataDimB = bondedDims.get(distDim2)
-
-        if dataDimA and dataDimB :
-          peakDimA = peak.findFirstPeakDim(dataDim=dataDimA)
-          peakDimB = peak.findFirstPeakDim(dataDim=dataDimB)
-          ppmA = pnt2ppm(peakDimA.position,peakDimA.dataDimRef)
-          ppmB = pnt2ppm(peakDimB.position,peakDimB.dataDimRef)
-
-          delta2 = abs(ppmA-ppmB)
-          if (delta2 <= tolDict[dataDimA][0] ) or (delta2 <= tolDict[dataDimB][0]):
-            diagonalPeaks.append(peak)
-            continue
-
-        else:
-          diagonalPeaks.append(peak)
-          continue
 
     if peak.figOfMerit < minMerit:
       poorMeritPeaks.append(peak)
       continue
 
     workingPeaks.append(peak)
+  print 'diagonal peaks: ', len(diagonalPeaks)
 
   mean = getMeanPeakIntensity(workingPeaks, intensityType=intensityType)
   if scale: # neither Zero nor None
