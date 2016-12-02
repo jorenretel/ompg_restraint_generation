@@ -1,9 +1,11 @@
 
+#pylint: disable=line-too-long, invalid-name
+
 from collections import defaultdict
 from itertools import combinations, product
 from ccpnmr.analysis.core.MoleculeBasic import areResonancesBound, getBoundAtoms
-from ccpnmr.analysis.core.AssignmentBasic import findMatchingPeakDimShifts, getBoundResonances
-from ccpnmr.analysis.core.ConstraintBasic import getPeakDimTolerance, isResidueInRange, getMeanPeakIntensity, getFixedResonance
+from ccpnmr.analysis.core.AssignmentBasic import findMatchingPeakDimShifts, getBoundResonances, assignAtomsToRes
+from ccpnmr.analysis.core.ConstraintBasic import getPeakDimTolerance, getMeanPeakIntensity, getFixedResonance #isResidueInRange
 from ccpnmr.analysis.core.StructureBasic import getAtomSetsDistance
 from ccpnmr.analysis.core.ExperimentBasic import getThroughSpaceDataDims, getIndirectDataDims, getIndirectThroughSpaceIsotopes
 from labeling_simple import getExperimentResonanceSetFractions
@@ -13,6 +15,14 @@ from optionalRestraint import OptionalRestraint
 
 
 def record_constraint_list(optional_restraints, constraintSet):
+    '''Take a list of OptionalRestraints and make
+       more permanent restraints based on them that
+       get stored in a constraintSet in CCPN.
+       Done like this because the CCPN constraints
+       do not have information about the direction
+       of magnetization transfer.
+
+    '''
 
     peak = optional_restraints[0].peak
     peakList = peak.peakList
@@ -24,12 +34,12 @@ def record_constraint_list(optional_restraints, constraintSet):
     newConstraint = distConstraintList.newDistanceConstraint
 
     for optional_restraint in optional_restraints:
-        constraint  = newConstraint(weight=1.0,
-                                    origData=optional_restraint.intensity,
-                                    targetValue=optional_restraint.targetValue,
-                                    upperLimit=optional_restraint.upperLimit,
-                                    lowerLimit=optional_restraint.lowerLimit,
-                                    error=optional_restraint.error)
+        constraint = newConstraint(weight=1.0,
+                                   origData=optional_restraint.intensity,
+                                   targetValue=optional_restraint.targetValue,
+                                   upperLimit=optional_restraint.upperLimit,
+                                   lowerLimit=optional_restraint.lowerLimit,
+                                   error=optional_restraint.error)
 
 
         peak = optional_restraint.peak
@@ -43,9 +53,9 @@ def record_constraint_list(optional_restraints, constraintSet):
                                             peakSerial=peak.serial)
 
         for res0, res1 in optional_restraint.restraint_options:
-            fixedResonance0 = getFixedResonance(constraintSet,res0)
-            fixedResonance1 = getFixedResonance(constraintSet,res1)
-            constraint.newDistanceConstraintItem(resonances=[fixedResonance0,fixedResonance1])
+            fixedResonance0 = getFixedResonance(constraintSet, res0)
+            fixedResonance1 = getFixedResonance(constraintSet, res1)
+            constraint.newDistanceConstraintItem(resonances=[fixedResonance0, fixedResonance1])
 
     return distConstraintList
 
@@ -82,7 +92,7 @@ def make_optional_restraint_set(peakList, tolerances, chemShiftRanges,
 
     intensityScale = 1.0
     if scale:
-        intensityScale = getMeanPeakIntensity([restraint.peak for restraint in optional_restraints],  intensityType=intensityType)
+        intensityScale = getMeanPeakIntensity([restraint.peak for restraint in optional_restraints], intensityType=intensityType)
 
     for optional_restraint in optional_restraints:
         optional_restraint.calculate_distance(intensityScale=intensityScale,
@@ -114,7 +124,7 @@ def create_optional_restraint(peak, tolerances, chemShiftRanges,
 
     new_restraint = OptionalRestraint(peak=peak,
                                       peak_assignment_options=assignments,
-                                      restraint_options = options,
+                                      restraint_options=options,
                                       labelling=label)
 
     return new_restraint
@@ -173,7 +183,7 @@ def find_peak_dimensional_assignment_options(peak, tolerances, chemShiftRanges,
                                              onlyAssignedResonances=True,
                                              onlyDimensionalAssignmentWhenPresent=False):
 
-    tolerances = dict([(dim,(mintol, maxtol, multi)) for dim, mintol, maxtol, multi in tolerances])
+    tolerances = dict([(dim, (mintol, maxtol, multi)) for dim, mintol, maxtol, multi in tolerances])
 
     chemShiftRangeDict = defaultdict(list)
     for dim, iso, minshift, maxshift in chemShiftRanges:
@@ -186,11 +196,10 @@ def find_peak_dimensional_assignment_options(peak, tolerances, chemShiftRanges,
         chemShiftRange = chemShiftRanges[peakDim.dataDim]
         resonances = find_dimensional_assignment_options(peakDim, tolerance,
                                                          chemShiftRange,
-                                                         aliasing= aliasing,
+                                                         aliasing=aliasing,
                                                          onlyAssignedResonances=onlyAssignedResonances,
                                                          onlyDimensionalAssignmentWhenPresent=onlyDimensionalAssignmentWhenPresent)
-        #if not resonances:
-        #    return []
+
         dimensional_options.append(resonances)
 
     return dimensional_options
@@ -199,10 +208,18 @@ def find_peak_dimensional_assignment_options(peak, tolerances, chemShiftRanges,
 def find_dimensional_assignment_options(peakDim, tolerance, chemShiftRange,
                                         aliasing=True, onlyAssignedResonances=True,
                                         onlyDimensionalAssignmentWhenPresent=False):
+    '''Find all resonances that can be assigned to a peak dimension.
+       If onlyAssignedResonances is True, only resonances are considered
+       that have an assignment to an atomset.
+       When onlyDimensionalAssignmentWhenPresent is True, no shiftmatching
+       is performed if there are already assignments to the peak dimension
+       present.
+
+    '''
 
     tolerance = getPeakDimTolerance(peakDim, *tolerance)
     if onlyDimensionalAssignmentWhenPresent:
-        resonances = resonances_assigned_to_peak_dimension(peakDim, onlyAssignedResonnces=onlyAssignedResonances)
+        resonances = resonances_assigned_to_peak_dimension(peakDim, onlyAssignedResonances=onlyAssignedResonances)
         if resonances:
             return resonances
 
@@ -213,18 +230,27 @@ def find_dimensional_assignment_options(peakDim, tolerance, chemShiftRange,
 
 
 def resonances_assigned_to_peak_dimension(peakDim, onlyAssignedResonances=True):
+    '''Get the resonances assigned to a peak dimension.
+       If onlyAssignedResonances is True, only resonances
+       are considered that have an assignment to an atomset.
+
+    '''
 
     resonance_assignments = []
     for peakDimContrib in peakDim.peakDimContribs:
         resonance = peakDimContrib.resonance
         resonanceSet = resonance.resonanceSet
-        if resonanceSet or not onlyAssignedShifts:
+        if (resonanceSet and resonanceSet.atomSets) or not onlyAssignedResonances:
             resonance_assignments.append(resonance)
     return resonance_assignments
 
 
 def shift_match_resonances(peakDim, tolerance, chemShiftRange,
                            aliasing, onlyAssignedResonances=True):
+    '''Shiftmatch a peak dimension. If onlyAssignedResonances
+       is True, only resonances are considered that have an
+       assignment to an atomset.
+    '''
 
     shifts = findMatchingPeakDimShifts(peakDim, chemShiftRange,
                                        tolerance=tolerance,
@@ -260,6 +286,7 @@ def peak_is_diagonal(peak, tolerances):
 
 
 def group_peak_dimensions_by_isotope(peak):
+    '''Returns a dict {isotopeCode:[peakDims]}.'''
 
     dimensions_by_isotope = defaultdict(list)
     for dim in peak.sortedPeakDims():
@@ -273,6 +300,7 @@ def peak_has_poor_merit(peak, minMerit):
 
 
 def peak_is_out_of_chemical_shift_ranges(peak, chemShiftRanges):
+    '''Whether a peak is within the chemical shift ranges.'''
 
     range_dict = {}
     for dim, isotope, minshift, maxshift in chemShiftRanges:
@@ -285,6 +313,10 @@ def peak_is_out_of_chemical_shift_ranges(peak, chemShiftRanges):
 
 
 def peak_is_fully_assigned(peak):
+    '''True when there are no unassigned
+       peak dimensions.
+
+    '''
 
     for dim in peak.sortedPeakDims():
         if not dim.peakDimContribs:
@@ -332,6 +364,10 @@ def transfer_is_possible(resonances, expTransfer):
 
 
 def within_distance_on_structure(structure, resonances, maxDist):
+    '''Check whether the distance between two resonances
+       is within the maximum allowed distance.
+
+    '''
     atomSets1 = resonances[0].resonanceSet.atomSets
     atomSets2 = resonances[1].resonanceSet.atomSets
     distance = getAtomSetsDistance(atomSets1, atomSets2,
@@ -343,6 +379,16 @@ def within_distance_on_structure(structure, resonances, maxDist):
 
 
 def through_space_resonances_combinations(resonances, peak):
+    '''For a peak and a set of resonances that could be
+       assigned to the sorted peak dimensions, return
+       which pairs of resonances could be actual resonances
+       between which magnetization is transferred in the
+       through-space transfer (and therefor are the resonances
+       restrained). When an indirect transfer is involved,
+       these can be resonances not included in the any
+       of the dimensional assignments.
+
+    '''
 
     spectrum = peak.peakList.dataSource
     experiment = spectrum.experiment
@@ -377,6 +423,10 @@ def through_space_resonances_combinations(resonances, peak):
 
 
 def get_bound_resonances_of_isotope(resonance, isotope):
+    '''For a resonance, get all resonances of an
+       isotope type bound to this resonance.
+
+    '''
 
     isotopeCode = '{}{}'.format(isotope.massNumber, isotope.chemElement.symbol)
 
@@ -388,29 +438,35 @@ def get_bound_resonances_of_isotope(resonance, isotope):
     # get covalently bound atomSts
     atoms = set()
     for atomSet in resonance.resonanceSet.atomSets:
-      atoms.update(getBoundAtoms(atomSet.findFirstAtom()))
+        atoms.update(getBoundAtoms(atomSet.findFirstAtom()))
 
     atomSets = set(a.atomSet for a in atoms if a.atomSet and \
                    a.chemAtom.chemElement is isotope.chemElement)
 
 
     if resonancesA:
-      # remove covalently impossible resonances
-      resonanceSets = set(y for x in atomSets for y in x.resonanceSets)
-      resonancesA = set(x for x in resonancesA
-                        if x.resonanceSet in resonanceSets)
+        # remove covalently impossible resonances
+        resonanceSets = set(y for x in atomSets for y in x.resonanceSets)
+        resonancesA = set(x for x in resonancesA
+                          if x.resonanceSet in resonanceSets)
 
     if not resonancesA:
-      # make new resonances for covanlently bound atoms
-      for atomSet in atomSets:
-        resonanceB = nmrProject.newResonance(isotopeCode=isotopeCode)
-        assignAtomsToRes([atomSet,], resonanceB)
-        resonancesA.add(resonanceB)
+        nmrProject = resonance.parent
+        # make new resonances for covanlently bound atoms
+        for atomSet in atomSets:
+            resonanceB = nmrProject.newResonance(isotopeCode=isotopeCode)
+            assignAtomsToRes([atomSet,], resonanceB)
+            resonancesA.add(resonanceB)
 
     return resonancesA
 
 
 def ambiguity_info(optional_restraints):
+    '''prints a list of length 10, representing
+       the amount of restraints with ambiguity
+       1-9 and >=10.
+
+    '''
 
     ambiguities = [0]*10
 
@@ -420,8 +476,9 @@ def ambiguity_info(optional_restraints):
             ambiguity = 10
         ambiguities[ambiguity-1] += 1
 
-    for i, count in enumerate(ambiguities):
-        print 'ambiguity: {} {}'.format(i+1, count)
+    #for i, count in enumerate(ambiguities):
+    #    print 'ambiguity: {} {}'.format(i+1, count)
+    print ambiguities
 
 
 
