@@ -35,7 +35,7 @@ def record_constraint_list(optional_restraints, constraintSet):
 
     for optional_restraint in optional_restraints:
         constraint = newConstraint(weight=1.0,
-                                   origData=optional_restraint.intensity,
+                                   origData=optional_restraint.intensityValue,
                                    targetValue=optional_restraint.targetValue,
                                    upperLimit=optional_restraint.upperLimit,
                                    lowerLimit=optional_restraint.lowerLimit,
