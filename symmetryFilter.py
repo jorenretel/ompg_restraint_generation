@@ -1,6 +1,7 @@
 
 
-def symmetry_filter(optionalRestraintLists, max_symmetry=None, cutoff_fraction=1.0):
+def symmetry_filter(optionalRestraintLists, max_symmetry=None,
+                    cutoff_fraction=1.0):
     '''Use multiple restraint lists based on different experiments
        and search for contributions that are supported by multiple
        peaks.
@@ -55,6 +56,7 @@ def create_interaction_sets(optionalRestraintLists):
 
 def remove_less_symmetric_options(optionalRestraint, interaction_sets,
                                   max_symmetry, cutoff_fraction):
+    '''Removing restaint items that have lower symmetry.'''
 
     symmetries = []
     for option in optionalRestraint.restraint_options:
@@ -73,6 +75,6 @@ def remove_less_symmetric_options(optionalRestraint, interaction_sets,
                                                              optionalRestraint.peak_assignment_options,
                                                              optionalRestraint.restraint_options):
         symmetry_fraction = symmetry / max_symmetry
-        if max_symmetry_fraction == cutoff_fraction and symmetry_fraction <= cutoff_fraction/ 2.0:
+        if max_symmetry_fraction == cutoff_fraction and symmetry_fraction <= max_symmetry_fraction/ 2.0:
             optionalRestraint.peak_assignment_options.remove(assignment_option)
             optionalRestraint.restraint_options.remove(restraint_option)
