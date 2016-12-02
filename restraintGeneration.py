@@ -1,52 +1,177 @@
 
 from collections import defaultdict
 from itertools import combinations, product
-from ccpnmr.analysis.core.MoleculeBasic import areResonancesBound
-from ccpnmr.analysis.core.AssignmentBasic import findMatchingPeakDimShifts
-from ccpnmr.analysis.core.ConstraintBasic import getPeakDimTolerance, isResidueInRange
+from ccpnmr.analysis.core.MoleculeBasic import areResonancesBound, getBoundAtoms
+from ccpnmr.analysis.core.AssignmentBasic import findMatchingPeakDimShifts, getBoundResonances
+from ccpnmr.analysis.core.ConstraintBasic import getPeakDimTolerance, isResidueInRange, getMeanPeakIntensity, getFixedResonance
 from ccpnmr.analysis.core.StructureBasic import getAtomSetsDistance
+from ccpnmr.analysis.core.ExperimentBasic import getThroughSpaceDataDims, getIndirectDataDims, getIndirectThroughSpaceIsotopes
 from labeling_simple import getExperimentResonanceSetFractions
+import optionalRestraint
+reload(optionalRestraint)
+from optionalRestraint import OptionalRestraint
+
+
+def record_constraint_list(optional_restraints, constraintSet):
+
+    peak = optional_restraints[0].peak
+    peakList = peak.peakList
+    spectrum = peakList.dataSource
+    experiment = spectrum.experiment
+
+    distConstraintList = constraintSet.newDistanceConstraintList()
+    distConstraintList.addExperimentSerial(experiment.serial)
+    newConstraint = distConstraintList.newDistanceConstraint
+
+    for optional_restraint in optional_restraints:
+        constraint  = newConstraint(weight=1.0,
+                                    origData=optional_restraint.intensity,
+                                    targetValue=optional_restraint.targetValue,
+                                    upperLimit=optional_restraint.upperLimit,
+                                    lowerLimit=optional_restraint.lowerLimit,
+                                    error=optional_restraint.error)
+
+
+        peak = optional_restraint.peak
+        peakList = peak.peakList
+        spectrum = peakList.dataSource
+        experiment = spectrum.experiment
+
+        constraint.newConstraintPeakContrib(experimentSerial=experiment.serial,
+                                            dataSourceSerial=spectrum.serial,
+                                            peakListSerial=peakList.serial,
+                                            peakSerial=peak.serial)
+
+        for res0, res1 in optional_restraint.restraint_options:
+            fixedResonance0 = getFixedResonance(constraintSet,res0)
+            fixedResonance1 = getFixedResonance(constraintSet,res1)
+            constraint.newDistanceConstraintItem(resonances=[fixedResonance0,fixedResonance1])
+
+    return distConstraintList
 
 
 
+def make_optional_restraint_set(peakList, tolerances, chemShiftRanges,
+                                aliasing=True, onlyAssignedResonances=True,
+                                onlyDimensionalAssignmentWhenPresent=False,
+                                labelling=None, minLabelFraction=0.1,
+                                structure=None, maxDist=None, scale=False,
+                                intensityType='volume', ignoreDiagonals=True,
+                                distanceFunction=None, params=None, minMerit=0.0):
 
-def test(argServer):
-    project = argServer.getProject()
-    nmrProject = project.findFirstNmrProject()
-    nmrConstraintStore = project.newNmrConstraintStore(nmrProject=nmrProject)
+    optional_restraints = []
+    for peak in list(peakList.peaks):
 
-    #HHN
-    expName = '248_07HHN'
-    peakListSerial = 2
-    experiment = nmrProject.findFirstExperiment(name=expName)
-    spectrum = experiment.findFirstDataSource()
-    peakList = spectrum.findFirstPeakList(serial=peakListSerial)
-
-    dataDim1, dataDim2, dataDim3 = spectrum.sortedDataDims()
-    tolerances = [(dataDim1, 0.07, 0.07, 1.0), (dataDim2, 0.1, 0.1, 1.0), (dataDim3, 0.4, 0.4, 1.0)]
-    chemShiftRanges = [(dataDim1, '1H', 0.0,13.0), (dataDim2, '1H', 0.0, 13.0),(dataDim3, '15N', 100.0, 140.0)]
-
-    for peak in peakList.peaks:
-        print peak
-        if peak_is_diagonal(peak, tolerances):
+        if ignoreDiagonals and peak_is_diagonal(peak, tolerances):
             continue
-        if peak_has_poor_merit(peak, 1.0):
+        if peak_has_poor_merit(peak, minMerit):
             continue
         if peak_is_out_of_chemical_shift_ranges(peak, chemShiftRanges):
             continue
-        print 'assignment status ', peak_is_fully_assigned(peak)
+        peak_is_fully_assigned(peak)
 
-        print find_peak_assignment_options(peak, tolerances, chemShiftRanges)
+        optional_restraint = create_optional_restraint(peak, tolerances, chemShiftRanges,
+                                                       aliasing=aliasing, onlyAssignedResonances=onlyAssignedResonances,
+                                                       onlyDimensionalAssignmentWhenPresent=onlyDimensionalAssignmentWhenPresent,
+                                                       labelling=labelling, minLabelFraction=minLabelFraction,
+                                                       structure=structure, maxDist=maxDist)
+        if not optional_restraint:
+            continue
+
+        optional_restraints.append(optional_restraint)
+
+    intensityScale = 1.0
+    if scale:
+        intensityScale = getMeanPeakIntensity([restraint.peak for restraint in optional_restraints],  intensityType=intensityType)
+
+    for optional_restraint in optional_restraints:
+        optional_restraint.calculate_distance(intensityScale=intensityScale,
+                                              distanceFunction=distanceFunction,
+                                              params=params,
+                                              intensityType=intensityType)
+
+    return optional_restraints
+
+
+
+
+
+def create_optional_restraint(peak, tolerances, chemShiftRanges,
+                              aliasing=True, onlyAssignedResonances=True,
+                              onlyDimensionalAssignmentWhenPresent=False,
+                              labelling=None, minLabelFraction=0.1,
+                              structure=None, maxDist=20.0):
+
+
+    assignments, options, label = find_peak_assignment_options(peak, tolerances, chemShiftRanges,
+                                                               aliasing=aliasing, onlyAssignedResonances=onlyAssignedResonances,
+                                                               onlyDimensionalAssignmentWhenPresent=onlyDimensionalAssignmentWhenPresent,
+                                                               labelling=labelling, minLabelFraction=minLabelFraction,
+                                                               structure=structure, maxDist=maxDist)
+
+    if not assignments or not options:
+        return None
+
+    new_restraint = OptionalRestraint(peak=peak,
+                                      peak_assignment_options=assignments,
+                                      restraint_options = options,
+                                      labelling=label)
+
+    return new_restraint
 
 
 def find_peak_assignment_options(peak, tolerances, chemShiftRanges,
                                  aliasing=True, onlyAssignedResonances=True,
                                  onlyDimensionalAssignmentWhenPresent=False,
-                                 labelling=True, minLabelFraction=0.1):
+                                 labelling=None, minLabelFraction=0.1,
+                                 structure=None, maxDist=20.0):
 
     experiment = peak.peakList.dataSource.experiment
     if labelling is True:
         labelling = experiment
+
+    dimensional_options = find_peak_dimensional_assignment_options(peak,
+                                                                   tolerances,
+                                                                   chemShiftRanges,
+                                                                   aliasing,
+                                                                   onlyAssignedResonances,
+                                                                   onlyDimensionalAssignmentWhenPresent)
+
+    peak_assignment_options = []
+    restraint_options = []
+    labelling_fractions = []
+    for resonances in product(*dimensional_options):
+        # 1. experiment
+        if not resonances_fit_experiment(resonances, experiment):
+            continue
+
+        through_space_pairs = through_space_resonances_combinations(resonances, peak)
+        for through_space_pair in through_space_pairs:
+
+            all_resonances = set(resonances + through_space_pair)
+
+            # 2. labelling
+            colabelling = 1.0
+            if labelling:
+                colabelling = getExperimentResonanceSetFractions(labelling, all_resonances)
+                if colabelling < minLabelFraction:
+                    continue
+            # 3. Distance in structure
+            if structure:
+                if not within_distance_on_structure(structure, through_space_pair, maxDist):
+                    continue
+
+            restraint_options.append(through_space_pair)
+            peak_assignment_options.append(resonances)
+            labelling_fractions.append(colabelling)
+
+    return peak_assignment_options, restraint_options, labelling_fractions
+
+
+def find_peak_dimensional_assignment_options(peak, tolerances, chemShiftRanges,
+                                             aliasing=True,
+                                             onlyAssignedResonances=True,
+                                             onlyDimensionalAssignmentWhenPresent=False):
 
     tolerances = dict([(dim,(mintol, maxtol, multi)) for dim, mintol, maxtol, multi in tolerances])
 
@@ -68,19 +193,7 @@ def find_peak_assignment_options(peak, tolerances, chemShiftRanges,
         #    return []
         dimensional_options.append(resonances)
 
-    peak_assignment_options = []
-    for resonances in product(*dimensional_options):
-        # 1. experiment
-        if not resonances_fit_experiment(resonances, experiment):
-            continue
-        # 2. labelling
-        if labelling:
-            colabelling = getExperimentResonanceSetFractions(labelling, resonances)
-            if colabelling < minLabelFraction:
-                continue
-        peak_assignment_options.append(resonances)
-
-    return peak_assignment_options
+    return dimensional_options
 
 
 def find_dimensional_assignment_options(peakDim, tolerance, chemShiftRange,
@@ -167,7 +280,7 @@ def peak_is_out_of_chemical_shift_ranges(peak, chemShiftRanges):
     for dim in peak.sortedPeakDims():
         minshift, maxshift = range_dict[dim.dataDim]
         if not minshift < dim.value < maxshift:
-            True
+            return True
     return False
 
 
@@ -216,3 +329,106 @@ def transfer_is_possible(resonances, expTransfer):
         return False
     #elif transferType == 'Jcoupling':
     return True
+
+
+def within_distance_on_structure(structure, resonances, maxDist):
+    atomSets1 = resonances[0].resonanceSet.atomSets
+    atomSets2 = resonances[1].resonanceSet.atomSets
+    distance = getAtomSetsDistance(atomSets1, atomSets2,
+                                   structure, method='noe')
+    if distance > maxDist:
+        return False
+    else:
+        return True
+
+
+def through_space_resonances_combinations(resonances, peak):
+
+    spectrum = peak.peakList.dataSource
+    experiment = spectrum.experiment
+
+    distDataDims = sorted(getThroughSpaceDataDims(spectrum), key=lambda dataDim: dataDim.dim)
+    indirectDataDims = [set(dims) for dims in getIndirectDataDims(spectrum)]
+
+    if len(distDataDims) != 2:
+        print 'Need 2 through-space data connection, this experiment contains {}.'.format(len(distDataDims))
+        return
+
+    if not set(distDataDims) in indirectDataDims:
+        return [tuple([resonances[distDataDim.dim-1] for distDataDim in distDataDims])]
+
+    isotopesDict = getIndirectThroughSpaceIsotopes(experiment)
+
+    through_space_resonances = []
+
+    for dataDim in distDataDims:
+        expDimRef = dataDim.expDim.sortedExpDimRefs()[0]
+        resonance = resonances[dataDim.dim-1]
+        indirectIsotope = isotopesDict[expDimRef][1]
+
+        if not indirectIsotope:
+            through_space_resonances.append([resonance])
+            continue
+        through_space_resonances.append(get_bound_resonances_of_isotope(resonance, indirectIsotope))
+
+    return list(product(*through_space_resonances))
+
+
+
+
+def get_bound_resonances_of_isotope(resonance, isotope):
+
+    isotopeCode = '{}{}'.format(isotope.massNumber, isotope.chemElement.symbol)
+
+    # Use getBoundResonance to get from e.g. Cga to Hga* and not Hgb*
+    resonancesA = set(x for x in getBoundResonances(resonance, recalculate=True)
+                      if x.isotopeCode == isotopeCode
+                      and x.resonanceSet)
+
+    # get covalently bound atomSts
+    atoms = set()
+    for atomSet in resonance.resonanceSet.atomSets:
+      atoms.update(getBoundAtoms(atomSet.findFirstAtom()))
+
+    atomSets = set(a.atomSet for a in atoms if a.atomSet and \
+                   a.chemAtom.chemElement is isotope.chemElement)
+
+
+    if resonancesA:
+      # remove covalently impossible resonances
+      resonanceSets = set(y for x in atomSets for y in x.resonanceSets)
+      resonancesA = set(x for x in resonancesA
+                        if x.resonanceSet in resonanceSets)
+
+    if not resonancesA:
+      # make new resonances for covanlently bound atoms
+      for atomSet in atomSets:
+        resonanceB = nmrProject.newResonance(isotopeCode=isotopeCode)
+        assignAtomsToRes([atomSet,], resonanceB)
+        resonancesA.add(resonanceB)
+
+    return resonancesA
+
+
+def ambiguity_info(optional_restraints):
+
+    ambiguities = [0]*10
+
+    for restraint in optional_restraints:
+        ambiguity = len(restraint.restraint_options)
+        if ambiguity > 10:
+            ambiguity = 10
+        ambiguities[ambiguity-1] += 1
+
+    for i, count in enumerate(ambiguities):
+        print 'ambiguity: {} {}'.format(i+1, count)
+
+
+
+
+
+
+
+
+
+

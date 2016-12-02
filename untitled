@@ -1,14 +1,16 @@
 
 
-v1. Check whether peak is diagonal
-v2. poor merit check
-v3. peaks in range
-v4. assigned peaks
-5. fit to magnetization transfer pathway, resonance, bound indirect
-6. labeling
-7. distance on reference structure
-8. round restraints
+v1. peak - Check whether peak is diagonal
+v2. peak - poor merit check
+v3. peak - peaks in range
+v4. peak - assigned peaks
+v5. resonances - fit to magnetization transfer pathway, resonance, bound indirect
+v6. resonances - labeling
+10. residue range
+7. round restraints
+v8. through-space resonances - distance on reference structure
 9. symmetry filtering
+
 
 
       peakDims = peak.sortedPeakDims()
