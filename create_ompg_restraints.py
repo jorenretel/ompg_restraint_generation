@@ -46,6 +46,7 @@ def create_ompg_restraints(argServer):
     distanceFunction = DistanceFunctionProtonDetected([(2500000, 3.1, 1.0, 3.5), (0.0, 4.4, 1.0, 5.5)])
     optionalRestraintsNNH = make_optional_restraint_set(peakList, tolerances,
                                                         chemShiftRanges,
+                                                        round_tolerance=True,
                                                         distanceFunction=distanceFunction,
                                                         intensityType='height')
     toleranceString = str(tolerances[0][1]) + '_' + str(tolerances[1][1]) + '_' + str(tolerances[2][1])
@@ -65,6 +66,7 @@ def create_ompg_restraints(argServer):
     distanceFunction = DistanceFunctionProtonDetected([(1500000, 3.1, 1.0, 3.5), (0.0, 4.4, 1.0, 5.5)])
     optionalRestraintsHHN = make_optional_restraint_set(peakList, tolerances,
                                                         chemShiftRanges,
+                                                        round_tolerance=True,
                                                         distanceFunction=distanceFunction,
                                                         intensityType='height')
     toleranceString = str(tolerances[0][1]) + '_' + str(tolerances[1][1]) + '_' + str(tolerances[2][1])

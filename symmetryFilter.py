@@ -1,4 +1,4 @@
-
+#pylint: disable=invalid-name
 
 def symmetry_filter(optionalRestraintLists, max_symmetry=None,
                     cutoff_fraction=1.0):
@@ -38,6 +38,7 @@ def symmetry_filter(optionalRestraintLists, max_symmetry=None,
                                           max_symmetry, cutoff_fraction)
 
 
+
 def create_interaction_sets(optionalRestraintLists):
     '''Make a set of tuples (resonance, resonance) for each
        optionalRestraintList, containing all interactions between
@@ -49,7 +50,8 @@ def create_interaction_sets(optionalRestraintLists):
     for optionalRestraintList in optionalRestraintLists:
         interaction_set = set()
         for optionalRestraint in optionalRestraintList:
-            interaction_set |= set(optionalRestraint.restraint_options)
+            for contrib in optionalRestraint. contributions:
+                interaction_set.add(contrib.restraint_resonances)
         interaction_sets.append(interaction_set)
     return interaction_sets
 
@@ -58,23 +60,23 @@ def remove_less_symmetric_options(optionalRestraint, interaction_sets,
                                   max_symmetry, cutoff_fraction):
     '''Removing restaint items that have lower symmetry.'''
 
-    symmetries = []
-    for option in optionalRestraint.restraint_options:
-        symmetry = 0
+
+    contribs = optionalRestraint.contributions
+    for contrib in contribs:
+        option = contrib.restraint_resonances
         for interaction_set in interaction_sets:
             if option in interaction_set:
-                symmetry += 1
+                contrib.symmetry += 1
             if (option[1], option[0]) in interaction_set:
-                symmetry += 1
+                contrib.symmetry += 1
 
-        symmetries.append(symmetry)
+    max_symmetry_fraction = max([c.symmetry for c in contribs])/max_symmetry
 
-    max_symmetry_fraction = max(symmetries)/max_symmetry
+    if max_symmetry_fraction < cutoff_fraction:
+        return
 
-    for symmetry, assignment_option, restraint_option in zip(symmetries,
-                                                             optionalRestraint.peak_assignment_options,
-                                                             optionalRestraint.restraint_options):
-        symmetry_fraction = symmetry / max_symmetry
-        if max_symmetry_fraction == cutoff_fraction and symmetry_fraction <= max_symmetry_fraction/ 2.0:
-            optionalRestraint.peak_assignment_options.remove(assignment_option)
-            optionalRestraint.restraint_options.remove(restraint_option)
+    for contrib in contribs[:]:
+
+        symmetry_fraction = contrib.symmetry / max_symmetry
+        if symmetry_fraction <= max_symmetry_fraction/ 2.0:
+            contribs.remove(contrib)

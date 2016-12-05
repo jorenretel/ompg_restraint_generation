@@ -34,6 +34,7 @@ def record_constraint_list(optional_restraints, constraintSet):
     newConstraint = distConstraintList.newDistanceConstraint
 
     for optional_restraint in optional_restraints:
+
         constraint = newConstraint(weight=1.0,
                                    origData=optional_restraint.intensityValue,
                                    targetValue=optional_restraint.targetValue,
@@ -52,7 +53,8 @@ def record_constraint_list(optional_restraints, constraintSet):
                                             peakListSerial=peakList.serial,
                                             peakSerial=peak.serial)
 
-        for res0, res1 in optional_restraint.restraint_options:
+        for contrib in optional_restraint.contributions:
+            res0, res1 = contrib.restraint_resonances
             fixedResonance0 = getFixedResonance(constraintSet, res0)
             fixedResonance1 = getFixedResonance(constraintSet, res1)
             constraint.newDistanceConstraintItem(resonances=[fixedResonance0, fixedResonance1])
@@ -67,6 +69,7 @@ def make_optional_restraint_set(peakList, tolerances, chemShiftRanges,
                                 labelling=None, minLabelFraction=0.1,
                                 structure=None, maxDist=None, scale=False,
                                 intensityType='volume', ignoreDiagonals=True,
+                                ignoreAssignedPeaks=True, round_tolerance=False,
                                 distanceFunction=None, params=None, minMerit=0.0):
 
     optional_restraints = []
@@ -78,16 +81,16 @@ def make_optional_restraint_set(peakList, tolerances, chemShiftRanges,
             continue
         if peak_is_out_of_chemical_shift_ranges(peak, chemShiftRanges):
             continue
-        peak_is_fully_assigned(peak)
+        if ignoreAssignedPeaks and peak_is_fully_assigned(peak):
+            continue
 
         optional_restraint = create_optional_restraint(peak, tolerances, chemShiftRanges,
                                                        aliasing=aliasing, onlyAssignedResonances=onlyAssignedResonances,
                                                        onlyDimensionalAssignmentWhenPresent=onlyDimensionalAssignmentWhenPresent,
                                                        labelling=labelling, minLabelFraction=minLabelFraction,
-                                                       structure=structure, maxDist=maxDist)
+                                                       structure=structure, maxDist=maxDist, round_tolerance=round_tolerance)
         if not optional_restraint:
             continue
-
         optional_restraints.append(optional_restraint)
 
     intensityScale = 1.0
@@ -110,7 +113,8 @@ def create_optional_restraint(peak, tolerances, chemShiftRanges,
                               aliasing=True, onlyAssignedResonances=True,
                               onlyDimensionalAssignmentWhenPresent=False,
                               labelling=None, minLabelFraction=0.1,
-                              structure=None, maxDist=20.0):
+                              structure=None, maxDist=20.0,
+                              round_tolerance=False):
 
 
     assignments, options, label = find_peak_assignment_options(peak, tolerances, chemShiftRanges,
@@ -119,6 +123,7 @@ def create_optional_restraint(peak, tolerances, chemShiftRanges,
                                                                labelling=labelling, minLabelFraction=minLabelFraction,
                                                                structure=structure, maxDist=maxDist)
 
+
     if not assignments or not options:
         return None
 
@@ -126,6 +131,9 @@ def create_optional_restraint(peak, tolerances, chemShiftRanges,
                                       peak_assignment_options=assignments,
                                       restraint_options=options,
                                       labelling=label)
+
+    if round_tolerance:
+        new_restraint.apply_round_tolerance(tolerances)
 
     return new_restraint
 
@@ -471,7 +479,7 @@ def ambiguity_info(optional_restraints):
     ambiguities = [0]*10
 
     for restraint in optional_restraints:
-        ambiguity = len(restraint.restraint_options)
+        ambiguity = len(restraint.contributions)
         if ambiguity > 10:
             ambiguity = 10
         ambiguities[ambiguity-1] += 1
