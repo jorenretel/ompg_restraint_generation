@@ -4,7 +4,7 @@ Scripts used to generate restraints for the structure calculation of Outer Membr
 
 This is code that runs in CCPNMR Analysis version 2 (http://www.ccpn.ac.uk/v2-software/software/analysis) as a macro in order to generate distance restraints based on peaks in NMR spectra.
 
-The file 'create_ompg_restraints.py' is specific for my own CCPNMR Analysis project. In this file the names of spectra, peak list serials can be changed along with the exact parameters that determine how restraints are generated.
+The file **create_ompg_restraints.py** is specific for my own CCPNMR Analysis project. In this file the names of spectra, peak list serials can be changed along with the exact parameters that determine how restraints are generated. The function create_ompg_restraints is the function loaded as a macro in CCPNMR Analysis by going to Macro--> Organise Macros --> Add Macro.
 
 All the other python modules in this directory are supporting the generation of restraints. A very similar process can be followed to generate restraints based on just functions already present in the code of CCPNMR Analysis itself located in ccpnmr2.x/python/ccpnmr/analysis/core/ConstraintBasic.py The code here is largely doing the same thing, except:
 
