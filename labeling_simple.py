@@ -1,3 +1,18 @@
+'''Functions to get the simultaneous labelling of a
+   set of resonances in a specifically isotope labeled
+   sample. Comparable functions are present in the
+   original CCPN code, but they always operate on
+   one or two resonances, while this code works with
+   a arbitrary number of resonances. The most high-level
+   function in this module is:
+
+   getExperimentResonanceSetFractions
+
+   which gives back a labelling fraction given an
+   experiment and a list of resonances.
+
+'''
+
 #pylint: disable=invalid-name
 
 

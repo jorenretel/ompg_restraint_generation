@@ -89,7 +89,7 @@ def make_optional_restraint_set(peakList, tolerances, chemShiftRanges,
                                                        onlyDimensionalAssignmentWhenPresent=onlyDimensionalAssignmentWhenPresent,
                                                        labelling=labelling, minLabelFraction=minLabelFraction,
                                                        structure=structure, maxDist=maxDist, round_tolerance=round_tolerance)
-        if not optional_restraint:
+        if not optional_restraint.contributions:
             continue
         optional_restraints.append(optional_restraint)
 
@@ -123,9 +123,6 @@ def create_optional_restraint(peak, tolerances, chemShiftRanges,
                                                                labelling=labelling, minLabelFraction=minLabelFraction,
                                                                structure=structure, maxDist=maxDist)
 
-
-    if not assignments or not options:
-        return None
 
     new_restraint = OptionalRestraint(peak=peak,
                                       peak_assignment_options=assignments,

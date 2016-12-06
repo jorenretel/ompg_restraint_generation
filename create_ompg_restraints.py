@@ -1,3 +1,14 @@
+'''CCPN Analysis Macro to generate the distance constraints used
+   for the structure determination of Outer Membrane Protein G.
+   In total 13 different spectra are used: 2 proton-detected
+   spectra and 11 13C-13C detected spectra.
+   This is the script to change and fill out the parameters
+   and names of the spectra an peak list serials in case you
+   want to create distance restraints in a similar way.
+
+'''
+
+#pylint: disable=line-too-long, invalid-name
 
 import restraintGeneration
 reload(restraintGeneration)
@@ -11,8 +22,9 @@ from gitStamp import get_git_hash
 
 
 def create_ompg_restraints(argServer):
-    '''Creates the distance restraints used for the structure
-    determination of Outer Membrane Protein G (OmpG).
+    '''This is the function loaded by CCPN Analysis. It creates the
+       distance restraints used for the structure determination of
+       Outer Membrane Protein G (OmpG).
 
      '''
 
@@ -42,7 +54,7 @@ def create_ompg_restraints(argServer):
     # Like in the Stucture: Make Restraints GUI:
     # (dataDim, min tolerance, max tolerance, line width multiplier)
     tolerances = [(dataDim1, 0.07, 0.07, 1.0), (dataDim2, 0.4, 0.4, 1.0), (dataDim3, 0.4, 0.4, 1.0)]
-    chemShiftRanges = [(dataDim1, '1H', 0.0,13.0), (dataDim2, '15N', 100.0, 140.0),(dataDim3, '15N', 100.0, 140.0)]
+    chemShiftRanges = [(dataDim1, '1H', 0.0, 13.0), (dataDim2, '15N', 100.0, 140.0), (dataDim3, '15N', 100.0, 140.0)]
     distanceFunction = DistanceFunctionProtonDetected([(2500000, 3.1, 1.0, 3.5), (0.0, 4.4, 1.0, 5.5)])
     optionalRestraintsNNH = make_optional_restraint_set(peakList, tolerances,
                                                         chemShiftRanges,
@@ -62,7 +74,7 @@ def create_ompg_restraints(argServer):
     peakList = spectrum.findFirstPeakList(serial=peakListSerial)
     dataDim1, dataDim2, dataDim3 = spectrum.sortedDataDims()
     tolerances = [(dataDim1, 0.07, 0.07, 1.0), (dataDim2, 0.1, 0.1, 1.0), (dataDim3, 0.4, 0.4, 1.0)]
-    chemShiftRanges = [(dataDim1, '1H', 0.0,13.0), (dataDim2, '1H', 0.0, 13.0),(dataDim3, '15N', 100.0, 140.0)]
+    chemShiftRanges = [(dataDim1, '1H', 0.0, 13.0), (dataDim2, '1H', 0.0, 13.0), (dataDim3, '15N', 100.0, 140.0)]
     distanceFunction = DistanceFunctionProtonDetected([(1500000, 3.1, 1.0, 3.5), (0.0, 4.4, 1.0, 5.5)])
     optionalRestraintsHHN = make_optional_restraint_set(peakList, tolerances,
                                                         chemShiftRanges,
@@ -72,23 +84,22 @@ def create_ompg_restraints(argServer):
     toleranceString = str(tolerances[0][1]) + '_' + str(tolerances[1][1]) + '_' + str(tolerances[2][1])
     HHN_name = 'HHN_peaklist{}_shiftmatch_{}_symmetry_filetered'.format(peakListSerial, toleranceString)
 
+
+    print 'NNH before symmetry filter:'
+    ambiguity_info(optionalRestraintsNNH)
+    print 'HHNH beforesymmetry filter:'
+    ambiguity_info(optionalRestraintsHHN)
     # Use redundancy from four peaks in hNhhNH and hNHH to select most
     # likely restraint items:
-    print 'NNH before:'
-    ambiguity_info(optionalRestraintsNNH)
-    print 'HHNH before:'
-    ambiguity_info(optionalRestraintsHHN)
-
     symmetry_filter([optionalRestraintsHHN, optionalRestraintsNNH], cutoff_fraction=1.0)
 
-    print 'NNH after:'
+    print 'NNH after symmetry filter:'
     ambiguity_info(optionalRestraintsNNH)
-    print 'NNH after:'
+    print 'NNH aftersymmetry filter:'
     ambiguity_info(optionalRestraintsHHN)
 
-    nmrConstraintStore = project.newNmrConstraintStore(nmrProject=nmrProject)
-
     # Make the optional proton-proton restraints into real ones and save them:
+    nmrConstraintStore = project.newNmrConstraintStore(nmrProject=nmrProject)
     HHN = record_constraint_list(optionalRestraintsHHN, nmrConstraintStore)
     NNH = record_constraint_list(optionalRestraintsNNH, nmrConstraintStore)
     HHN.name = HHN_name
@@ -140,7 +151,7 @@ def shift_match_2D_CC(nmrProject, expName, peakListSerial,
 
     print expName
     ambiguity_info(constraints)
-    constraints =record_constraint_list(constraints, nmrConstraintStore)
+    constraints = record_constraint_list(constraints, nmrConstraintStore)
     toleranceString = str(tolerances[0][1]) + '_' + str(tolerances[1][1])
     constraints.name = '{}_{}_shiftmatch_{}'.format(expName, peakListSerial, toleranceString)
     constraints.details = details
