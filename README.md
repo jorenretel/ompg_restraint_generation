@@ -1,0 +1,13 @@
+
+Scripts used to generate restraints for the structure calculation of Outer Membrane protein G (OmpG) by Solid-State NMR
+===========================================================================================================================
+
+This is code that runs in CCPNMR Analysis version 2 (http://www.ccpn.ac.uk/v2-software/software/analysis) as a macro in order to generate distance restraints based on peaks in NMR spectra.
+
+The file 'create_ompg_restraints.py' is specific for my own CCPNMR Analysis project. In this file the names of spectra, peak list serials can be changed along with the exact parameters that determine how restraints are generated.
+
+All the other python modules in this directory are supporting the generation of restraints. A very similar process can be followed to generate restraints based on just functions already present in the code of CCPNMR Analysis itself located in ccpnmr2.x/python/ccpnmr/analysis/core/ConstraintBasic.py The code here is largely doing the same thing, except:
+
+1. An additional filter in symmetryFilter.py that uses restraints from multiple experiments and selects ones that are supported by multiple sets. In the case of OmpG, this applies to two spectra: the hNHH and the hNhhNH. In these two spectra, a total of 4 peaks are expected for each two NH pairs close in space. The filter makes use of this redundancy and removes less likely assignment options for each restraint.
+2. Round restraints on dimensions corresponding to directly bonded nuclei. Instead of just taking a 'square' box based on the individual dimensions, a distance between the peak position and the chemical shifts is calculated through multiple dimensions. This is applied to the hNHH and hNhhNH spectra. The resulting restraints are a bit less ambiguous, but also when this step is omitted structure calculations converge.
+3. Treatment of labeling schemes. In the makeAmbigDistConstraints function of ConstraintBasic.py (which is the standard function for shift-matching peaks in CCPNMR Analysis) the labeling of resonances on both sides of the through-space transfer is calculated independently and tested to be over the 'minLabelFraction' threshold. This however retains assignment options that are not possible with the labeling scheme. This is particularly true when labeling schemes with different isotopomers, like 2-, and 1,3-glycerol labeling schemes are used. In the code, the simultaneous labeling of all resonances is calculated and therefor does not give rise to these erroneous restraint contributions. The code that does this is located in 'labeling_simple.py'.
